@@ -1,0 +1,56 @@
+version: '3'
+
+tasks:
+  dev:
+    desc: Build and start the Docker containers
+    aliases:
+      - default
+    deps:
+      - bootstrap
+      - ssl
+    cmds:
+      - docker compose up --detach --remove-orphans
+
+  stop:
+    desc: Stop and remove the Docker containers
+    aliases:
+      - down
+    cmds:
+      - docker compose down
+
+  ssl:
+    desc: Generate local SSL certificates
+    cmds:
+      - mkcert -key-file certs/local-key.pem -cert-file certs/local-cert.pem *.app.localhost app.localhost
+      - mkcert -install
+    status:
+      - test -f certs/local-cert.pem
+      - test -f certs/local-key.pem
+
+  bootstrap:
+    internal: true
+    cmds:
+      - docker compose pull
+      - docker compose build
+      - task: yarn
+      - task: composer
+
+  yarn:
+    internal: true
+    cmds:
+      - docker compose run --rm web yarn install --pure-lockfile
+    sources:
+      - ./apps/web/package.json
+      - ./apps/web/yarn.lock
+    generates:
+      - ./apps/web/node_modules/**/*
+
+  composer:
+    internal: true
+    cmds:
+      - docker compose run --rm php composer install
+    sources:
+      - ./apps/api/composer.json
+      - ./apps/api/composer.lock
+    generates:
+      - ./apps/api/vendor/**/*
